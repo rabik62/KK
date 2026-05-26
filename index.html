@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<title>Kalendarz dla Ciebie ❤️</title>
+
+<style>
+body {
+    font-family: Arial;
+    background: linear-gradient(135deg, #5f2c82, #9c6ade);
+    text-align: center;
+    padding: 20px;
+    color: white;
+}
+
+.subtitle { margin-bottom: 10px; }
+.timer { margin-bottom: 25px; font-size: 18px; }
+
+/* GRID */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 12px;
+    max-width: 650px;
+    margin: auto;
+}
+
+.day {
+    height: 80px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    position: relative;
+}
+
+/* STANY */
+.available { background:#a7c7ff; color:#5f2c82; cursor:pointer; }
+.locked { background:#d3cce3; cursor:not-allowed; }
+.opened { border:3px solid white; }
+
+/* TOOLTIP */
+.tooltip {
+    visibility: hidden;
+    position: absolute;
+    bottom: 110%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: black;
+    padding: 5px 10px;
+    border-radius: 10px;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.day.locked:hover .tooltip {
+    visibility: visible;
+}
+
+/* POPUP */
+.popup {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    justify-content: center;
+    align-items: center;
+}
+
+.popup-box { text-align: center; }
+
+.close-btn {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+/* PREZENT */
+.gift {
+    width: 200px;
+    height: 200px;
+    background: #ff5e9c;
+    border-radius: 20px;
+    position: relative;
+    margin: auto;
+    overflow: hidden;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+}
+
+.lid {
+    width: 100%;
+    height: 40%;
+    background: #ff3b87;
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 20px 20px 5px 5px;
+    transition: transform 0.6s;
+    z-index: 2;
+}
+
+.gift.open .lid {
+    transform: translateY(-60px);
+}
+
+.ribbon-vertical {
+    width: 20px;
+    height: 100%;
+    background: white;
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+}
+
+.ribbon-horizontal {
+    height: 20px;
+    width: 100%;
+    background: white;
+    position: absolute;
+    top: 40%;
+}
+
+/* KARTKA */
+.content {
+    display: none;
+    background: linear-gradient(135deg,#fff,#f3e9ff);
+    color: #5f2c82;
+    padding: 20px;
+    border-radius: 20px;
+    margin-top: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    max-width: 300px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.content img {
+    max-width: 100%;
+    border-radius: 15px;
+    margin-bottom: 10px;
+}
+
+/* LEGENDA */
+.legend {
+    margin-top: 30px;
+    display: flex;
+    justify-content: center;
+    gap: 25px;
+    flex-wrap: wrap;
+    background: rgba(255,255,255,0.1);
+    padding: 10px 15px;
+    border-radius: 15px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.legend-box {
+    width: 20px;
+    height: 20px;
+    border-radius: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Kalendarz dla Ciebie ❤️</h1>
+<div class="subtitle">
+Otwierasz jedno okienko dziennie, każdy dzień skrywa inną niespodziankę 💌
+</div>
+
+<div class="timer" id="timer"></div>
+<div class="grid" id="calendar"></div>
+
+<!-- LEGENDA -->
+<div class="legend">
+    <div class="legend-item">
+        <div class="legend-box" style="background:#a7c7ff;"></div>
+        <strong>Dostępny</strong>
+    </div>
+    <div class="legend-item">
+        <div class="legend-box" style="background:#d3cce3;"></div>
+        <strong>Zablokowany 🔒</strong>
+    </div>
+    <div class="legend-item">
+        <div class="legend-box" style="background:#a7c7ff; border:2px solid white;"></div>
+        <strong>Otwarty</strong>
+    </div>
+</div>
+
+<!-- POPUP -->
+<div class="popup" id="popup">
+    <div class="close-btn" onclick="closePopup()">❌</div>
+
+    <div class="popup-box">
+        <div class="gift" id="gift" onclick="openGift()">
+            <div class="lid"></div>
+            <div class="ribbon-vertical"></div>
+            <div class="ribbon-horizontal"></div>
+        </div>
+
+        <div class="content" id="content"></div>
+    </div>
+</div>
+
+<script>
+const startDate = new Date("2026-06-19T00:01:00+02:00");
+const totalDays = 31;
+
+const calendar = document.getElementById("calendar");
+let nextUnlock = null;
+
+// ✅ GENEROWANIE DNI
+for (let i = 0; i < totalDays; i++) {
+
+    const dayDate = new Date(startDate);
+    dayDate.setDate(startDate.getDate() + i);
+
+    const div = document.createElement("div");
+    div.classList.add("day");
+
+    const dayNumber = i + 1;
+    div.innerHTML = "Dzień " + dayNumber;
+
+    const now = new Date();
+
+    if (now < dayDate && i !== 0) {
+        div.classList.add("locked");
+
+        if (!nextUnlock || dayDate < nextUnlock) {
+            nextUnlock = dayDate;
+        }
+
+        const tooltip = document.createElement("div");
+        tooltip.classList.add("tooltip");
+        tooltip.innerHTML = "Odblokuje się: " + dayDate.toLocaleString("pl-PL");
+
+        div.appendChild(tooltip);
+
+    } else {
+        div.classList.add("available");
+
+        div.onclick = () => {
+            div.classList.add("opened");
+            openDay(dayNumber);
+        };
+    }
+
+    calendar.appendChild(div);
+}
+
+// ✅ LICZNIK
+function updateTimer() {
+    if (!nextUnlock) return;
+
+    const now = new Date();
+    const diff = nextUnlock - now;
+
+    if (diff <= 0) {
+        document.getElementById("timer").innerHTML =
+            "💜 Nowa niespodzianka już dostępna!";
+        return;
+    }
+
+    const h = Math.floor(diff / 1000 / 60 / 60);
+    const m = Math.floor(diff / 1000 / 60) % 60;
+    const s = Math.floor(diff / 1000) % 60;
+
+    document.getElementById("timer").innerHTML =
+        "⏳ Następna niespodzianka za: " + h + "h " + m + "m " + s + "s";
+}
+
+setInterval(updateTimer, 1000);
+
+// ✅ POPUP
+let currentDay = 0;
+
+function openDay(day) {
+    currentDay = day;
+    document.getElementById("popup").style.display = "flex";
+    document.getElementById("content").style.display = "none";
+    document.getElementById("gift").classList.remove("open");
+}
+
+function closePopup() {
+    document.getElementById("popup").style.display = "none";
+}
+
+// ✅ PREZENT
+function openGift() {
+    const gift = document.getElementById("gift");
+    const content = document.getElementById("content");
+
+    gift.classList.add("open");
+
+    setTimeout(() => {
+        content.innerHTML = `
+            <h2>Dzień 1</h2>
+            <img src="dzien1.jpg">
+            <p>
+            Tutaj wszystko się zaczęło. Hotel Plaza Inn w Monachium. Mimo, że nie do końca cały dzień wyszedł tak, jak powinien to końcówka już była bardzo przyjemna. Wtedy wydarzyło się coś magicznego, nie sądzisz? Nagle nie było żadnej krępacji, mówiliśmy sobie bardzo dużo i bardzo dużych rzeczy. Tak się ciesze, że wtedy do Ciebie napisałem, a Ty zdecydowałaś się jednak przyjść. Kto wie, jak dzisiaj byśmy wyglądali, gdyby nie to? To jest to, co zawsze Ci mówię, jest tyle możliwości i tyle po drodze rzeczy mogło się wydarzyć inaczej, a jednak jesteśmy w miejscu, w którym jesteśmy. Niesamowite, co?
+            Pamiętasz outfit, jaki miałaś na sobie? Najsłodszy jaki kiedykolwiek widziałem. Cudownie wyglądałaś.
+            118 to moja ulubiona liczba 💜. *sombr plays in the background*
+            </p>
+        `;
+       
+        content.style.display = "block";
+
+    }, 500);
+}
+</script>
+
+</body>
+</html>
